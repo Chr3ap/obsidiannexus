@@ -7,29 +7,13 @@ const compression = require('compression');
 const app = express();
 const port = 3000;
 
-// Configure CORS more explicitly
-const corsOptions = {
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization']
-};
-
 // Apply middleware
 app.use(compression());
-app.use(cors(corsOptions));
 app.use(express.json({limit: '50mb'}));
+app.use(cors());
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Log all requests
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-});
 
 // Serve index.html for the root path
 app.get('/', (req, res) => {
@@ -62,22 +46,10 @@ app.get('/api/listings', (req, res) => {
         }
 
         console.log(`Successfully loaded ${parsedData.features.length} listings`);
-        
-        // Send response with proper headers
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-        
-        // Add cache control headers
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        
         res.json(parsedData);
         
     } catch (error) {
-        console.error('Detailed error:', error);
+        console.error('Error reading GeoJSON file:', error);
         res.status(500).json({ 
             error: 'Failed to load listings data',
             message: error.message
@@ -89,9 +61,4 @@ app.get('/api/listings', (req, res) => {
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
     console.log('Current directory:', __dirname);
-    
-    // Check if file exists on startup
-    const geoJsonPath = path.join(__dirname, 'listings.geojson');
-    console.log('Checking for listings.geojson at:', geoJsonPath);
-    console.log('File exists:', fs.existsSync(geoJsonPath));
 }); 
