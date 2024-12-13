@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Listings - Zillow Clone</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { overflow: hidden; }
+        
+        #map {
+            height: calc(100vh - 56px);
+            width: 100%;
+        }
+        
+        .listing-sidebar {
+            height: calc(100vh - 56px);
+            overflow-y: auto;
+            background: white;
+            scrollbar-width: thin;
+            scrollbar-color: #006AFF #f0f0f0;
+        }
+        
+        .listing-sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .listing-sidebar::-webkit-scrollbar-track {
+            background: #f0f0f0;
+        }
+        
+        .listing-sidebar::-webkit-scrollbar-thumb {
+            background-color: #006AFF;
+            border-radius: 4px;
+        }
+        
+        .property-card {
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 1px solid #e1e1e1;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        
+        .property-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .property-card .card-body {
+            padding: 0.75rem;
+        }
+
+        .navbar {
+            padding: 0.5rem 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            color: #006AFF !important;
+            font-weight: bold;
+            font-size: 20px;
+            margin-right: 1rem;
+        }
+        
+        .search-container {
+            flex: 1;
+            max-width: 500px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .search-container .form-control {
+            padding: 0.5rem 0.75rem 0.5rem 2rem;
+            font-size: 0.9rem;
+            height: 38px;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .property-status {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-sold {
+            background: #ff4444;
+            color: white;
+        }
+
+        .status-available {
+            background: #00C851;
+            color: white;
+        }
+
+        .property-details {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #e1e1e1;
+            font-size: 0.8rem;
+        }
+
+        .detail-item {
+            text-align: center;
+        }
+
+        .detail-label {
+            color: #666;
+            font-size: 0.75rem;
+            margin-bottom: 1px;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .property-info {
+            font-size: 0.9rem;
+            line-height: 1.3;
+        }
+
+        .property-price {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #006AFF;
+            margin-bottom: 0.25rem;
+        }
+
+        .property-address {
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .property-description {
+            font-size: 0.8rem;
+            color: #666;
+            margin: 0.5rem 0;
+            line-height: 1.2;
+        }
+
+        .btn-view-details {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            width: 100%;
+        }
+
+        .popup-content {
+            font-size: 0.9rem;
+            line-height: 1.3;
+            padding: 0.25rem;
+        }
+
+        .popup-content h6 {
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .popup-content p {
+            margin-bottom: 0.25rem;
+        }
+
+        .custom-marker {
+            width: 20px !important;
+            height: 20px !important;
+            background: #006AFF;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 768px) {
+            .listing-sidebar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 60vh;
+                z-index: 1000;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                transform: translateY(calc(100% - 35px));
+                border-radius: 12px 12px 0 0;
+                transition: transform 0.3s ease;
+            }
+            
+            .listing-sidebar.expanded {
+                transform: translateY(0);
+            }
+            
+            .listing-header {
+                padding: 0.5rem;
+                background: white;
+                position: sticky;
+                top: 0;
+                z-index: 1;
+                border-radius: 12px 12px 0 0;
+                text-align: center;
+            }
+            
+            .handle {
+                width: 36px;
+                height: 4px;
+                background: #e1e1e1;
+                border-radius: 2px;
+                margin: 0 auto 0.5rem;
+            }
+
+            .toggle-view {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                bottom: 1rem;
+                right: 1rem;
+                z-index: 1000;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background: #006AFF;
+                color: white;
+                border: none;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Zillow Clone</a>
+            <div class="search-container d-flex">
+                <i class="fas fa-search search-icon"></i>
+                <input class="form-control me-2" type="search" id="search-input" placeholder="Enter an address, neighborhood, city, or ZIP code" aria-label="Search">
+                <button class="btn btn-outline-primary rounded-pill" type="button" onclick="handleSearch()">Search</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid p-0">
+        <div class="row g-0">
+            <!-- Property Listings Sidebar -->
+            <div class="col-md-4 col-lg-3 listing-sidebar">
+                <div class="listing-header d-md-none">
+                    <div class="handle"></div>
+                    <h5 class="text-center mb-0">Property Listings</h5>
+                </div>
+                <div id="listings-container" class="p-3">
+                    <!-- Listings will be dynamically inserted here -->
+                </div>
+                <div class="loading-overlay">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div class="error-message" id="error-message">
+                    Unable to load listings. Please try again later.
+                </div>
+            </div>
+
+            <!-- Map -->
+            <div class="col-md-8 col-lg-9">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Toggle Button -->
+    <button class="toggle-view" aria-label="Toggle View">
+        <i class="fas fa-list"></i>
+    </button>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let markers = [];
+        let searchTimeout;
+        
+        // Initialize map
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false
+            }).setView([40.7128, -74.0060], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // Add zoom control to the right
+            L.control.zoom({
+                position: 'topright'
+            }).addTo(map);
+        }
+
+        // Mobile sidebar toggle functionality
+        document.querySelector('.toggle-view')?.addEventListener('click', () => {
+            const sidebar = document.querySelector('.listing-sidebar');
+            sidebar.classList.toggle('expanded');
+            document.querySelector('.toggle-view i').classList.toggle('fa-list');
+            document.querySelector('.toggle-view i').classList.toggle('fa-map');
+        });
+
+        // Handle drag functionality for mobile
+        const sidebar = document.querySelector('.listing-sidebar');
+        let startY;
+        let startHeight;
+        let isDragging = false;
+
+        document.querySelector('.handle')?.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+            startHeight = parseInt(getComputedStyle(sidebar).height);
+            isDragging = true;
+            
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onTouchEnd);
+        });
+
+        function onTouchMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const delta = startY - e.touches[0].clientY;
+            const newHeight = Math.max(60, Math.min(startHeight + delta, window.innerHeight - 56));
+            sidebar.style.height = `${newHeight}px`;
+            sidebar.style.transform = 'none';
+        }
+
+        function onTouchEnd() {
+            isDragging = false;
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onTouchEnd);
+        }
+
+        // Search functionality
+        function handleSearch() {
+            const searchInput = document.getElementById('search-input');
+            const query = searchInput.value.trim();
+            
+            if (!query) return;
+            
+            // Implement your search logic here
+            console.log('Searching for:', query);
+        }
+        
+        // Debounced search input handler
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                handleSearch();
+            }, 500);
+        });
+
+        // Fetch and display listings with loading state
+        async function fetchListings() {
+            const loadingOverlay = document.querySelector('.loading-overlay');
+            const errorMessage = document.getElementById('error-message');
+            
+            try {
+                loadingOverlay.classList.add('active');
+                errorMessage.classList.remove('active');
+                
+                const response = await fetch('/api/listings');
+                if (!response.ok) throw new Error('Failed to fetch listings');
+                
+                const data = await response.json();
+                displayListings(data);
+            } catch (error) {
+                console.error('Error fetching listings:', error);
+                errorMessage.classList.add('active');
+            } finally {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        // Display listings on both the sidebar and map
+        function displayListings(geojson) {
+            const container = document.getElementById('listings-container');
+            container.innerHTML = '';
+
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            if (!geojson.features || !geojson.features.length) {
+                container.innerHTML = '<div class="alert alert-info">No properties found.</div>';
+                return;
+            }
+
+            geojson.features.forEach((feature, index) => {
+                const properties = feature.properties;
+                const coordinates = feature.geometry.coordinates;
+
+                // Create custom marker icon
+                const icon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="width: 24px; height: 24px;"></div>`,
+                    iconSize: [24, 24]
+                });
+
+                // Add marker to map
+                const marker = L.marker([coordinates[1], coordinates[0]], { icon })
+                    .bindPopup(createPopupContent(properties))
+                    .addTo(map);
+                
+                marker.on('click', () => {
+                    highlightCard(index);
+                });
+                
+                markers.push(marker);
+
+                // Add listing card to sidebar
+                container.innerHTML += createListingCard(properties, index);
+            });
+
+            // Fit map bounds to show all markers
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds(), {
+                    padding: [50, 50]
+                });
+            }
+        }
+
+        function highlightCard(index) {
+            const cards = document.querySelectorAll('.property-card');
+            cards.forEach(card => card.classList.remove('active'));
+            cards[index]?.classList.add('active');
+            cards[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function createPopupContent(properties) {
+            const formattedPrice = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(properties.price);
+
+            return `
+                <div class="popup-content">
+                    <h6>${formattedPrice}</h6>
+                    <p>${properties.location_name}</p>
+                    <p>${properties.bedrooms} bd • ${properties.bathrooms} ba • ${properties.sq_footage.toLocaleString()} sf</p>
+                    <small class="text-muted">${properties.year_built} • ${properties.county}</small>
+                </div>
+            `;
+        }
+
+        function createListingCard(properties, index) {
+            const formattedPrice = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(properties.price);
+
+            const statusClass = properties.availability ? 'status-available' : 'status-sold';
+            const statusText = properties.availability ? 'Available' : properties.status;
+
+            return `
+                <div class="card property-card" onclick="focusListing(${index})">
+                    <div class="card-body">
+                        <span class="property-status ${statusClass}">${statusText}</span>
+                        <div class="property-info">
+                            <div class="property-price">${formattedPrice}</div>
+                            <div class="property-address">${properties.location_name}</div>
+                        </div>
+                        
+                        <div class="property-details">
+                            <div class="detail-item">
+                                <div class="detail-value">${properties.bedrooms}</div>
+                                <div class="detail-label">Beds</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">${properties.bathrooms}</div>
+                                <div class="detail-label">Baths</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">${properties.sq_footage.toLocaleString()}</div>
+                                <div class="detail-label">Sq.Ft</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">${properties.year_built}</div>
+                                <div class="detail-label">Year</div>
+                            </div>
+                        </div>
+
+                        <div class="property-description">${properties.description || ''}</div>
+                        
+                        <a href="${properties.link}" target="_blank" class="btn btn-outline-primary btn-sm btn-view-details" 
+                           onclick="event.stopPropagation()">
+                            View Details
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+
+        function focusListing(index) {
+            const marker = markers[index];
+            map.setView(marker.getLatLng(), 16);
+            marker.openPopup();
+            
+            // On mobile, expand the sidebar when a listing is selected
+            if (window.innerWidth <= 768) {
+                document.querySelector('.listing-sidebar').classList.add('expanded');
+            }
+            
+            highlightCard(index);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            map.invalidateSize();
+        });
+
+        // Initialize the application
+        initMap();
+        fetchListings();
+    </script>
+</body>
+</html> 
