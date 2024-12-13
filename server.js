@@ -13,7 +13,7 @@ app.use(express.json({limit: '50mb'}));
 app.use(cors());
 
 // Serve static files from public directory
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
 // Serve index.html for the root path
 app.get('/', (req, res) => {

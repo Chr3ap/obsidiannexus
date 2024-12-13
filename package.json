@@ -1,7 +1,7 @@
 {
-  "name": "zillow-clone",
+  "name": "obsidian-nexus",
   "version": "1.0.0",
-  "description": "A Zillow-like web application for displaying property listings",
+  "description": "A web application for displaying property listings",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

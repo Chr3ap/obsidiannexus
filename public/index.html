@@ -3,321 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Property Listings - Zillow Clone</title>
+    <title>Property Listings - Obsidian Nexus</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { overflow: hidden; }
-        
-        #map {
-            height: calc(100vh - 56px);
-            width: 100%;
-        }
-        
-        .listing-sidebar {
-            height: calc(100vh - 56px);
-            overflow-y: auto;
-            background: white;
-            scrollbar-width: thin;
-            scrollbar-color: #006AFF #f0f0f0;
-        }
-        
-        .listing-sidebar::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        .listing-sidebar::-webkit-scrollbar-track {
-            background: #f0f0f0;
-        }
-        
-        .listing-sidebar::-webkit-scrollbar-thumb {
-            background-color: #006AFF;
-            border-radius: 4px;
-        }
-        
-        .property-card {
-            cursor: pointer;
-            transition: transform 0.2s;
-            border: 1px solid #e1e1e1;
-            margin-bottom: 0.5rem;
-            position: relative;
-        }
-        
-        .property-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .property-card .card-body {
-            padding: 0.75rem;
-        }
-
-        .navbar {
-            padding: 0.5rem 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .navbar-brand {
-            color: #006AFF !important;
-            font-weight: bold;
-            font-size: 20px;
-            margin-right: 1rem;
-        }
-        
-        .search-container {
-            position: relative;
-            max-width: 600px;
-            margin: 0 1rem;
-        }
-        
-        .search-container .form-control {
-            padding-left: 2.5rem;
-            padding-right: 1rem;
-            height: 44px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .search-container .form-control:focus {
-            border-color: #006AFF;
-            box-shadow: 0 0 0 3px rgba(0,106,255,0.1);
-        }
-        
-        .search-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #666;
-        }
-        
-        .property-status {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 3px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .status-sold {
-            background: #ff4444;
-            color: white;
-        }
-
-        .status-available {
-            background: #00C851;
-            color: white;
-        }
-
-        .property-details {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            padding-top: 0.5rem;
-            border-top: 1px solid #e1e1e1;
-            font-size: 0.8rem;
-        }
-
-        .detail-item {
-            text-align: center;
-        }
-
-        .detail-label {
-            color: #666;
-            font-size: 0.75rem;
-            margin-bottom: 1px;
-        }
-
-        .detail-value {
-            font-weight: 600;
-            color: #333;
-        }
-
-        .property-info {
-            font-size: 0.9rem;
-            line-height: 1.3;
-        }
-
-        .property-price {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #006AFF;
-            margin-bottom: 0.25rem;
-        }
-
-        .property-address {
-            font-size: 0.85rem;
-            margin-bottom: 0.5rem;
-            color: #333;
-        }
-
-        .property-description {
-            font-size: 0.8rem;
-            color: #666;
-            margin: 0.5rem 0;
-            line-height: 1.2;
-        }
-
-        .btn-view-details {
-            font-size: 0.8rem;
-            padding: 0.25rem 0.5rem;
-            width: 100%;
-        }
-
-        .popup-content {
-            font-size: 0.9rem;
-            line-height: 1.3;
-            padding: 0.25rem;
-        }
-
-        .popup-content h6 {
-            font-size: 1rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .popup-content p {
-            margin-bottom: 0.25rem;
-        }
-
-        .custom-marker {
-            width: 20px !important;
-            height: 20px !important;
-            background: #006AFF;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-
-        @media (max-width: 768px) {
-            .listing-sidebar {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 60vh;
-                z-index: 1000;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                transform: translateY(calc(100% - 35px));
-                border-radius: 12px 12px 0 0;
-                transition: transform 0.3s ease;
-            }
-            
-            .listing-sidebar.expanded {
-                transform: translateY(0);
-            }
-            
-            .listing-header {
-                padding: 0.5rem;
-                background: white;
-                position: sticky;
-                top: 0;
-                z-index: 1;
-                border-radius: 12px 12px 0 0;
-                text-align: center;
-            }
-            
-            .handle {
-                width: 36px;
-                height: 4px;
-                background: #e1e1e1;
-                border-radius: 2px;
-                margin: 0 auto 0.5rem;
-            }
-
-            .toggle-view {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                position: fixed;
-                bottom: 1rem;
-                right: 1rem;
-                z-index: 1000;
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                background: #006AFF;
-                color: white;
-                border: none;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                font-size: 0.9rem;
-            }
-        }
-
-        .loading-overlay, .error-message {
-            display: none;
-            text-align: center;
-            padding: 1rem;
-        }
-
-        .loading-overlay.active, .error-message.active {
-            display: block;
-        }
-
-        .error-message {
-            color: #dc3545;
-        }
-
-        .form-select {
-            min-width: 120px;
-            font-size: 0.9rem;
-            padding: 0.375rem 2rem 0.375rem 0.75rem;
-            border-radius: 4px;
-        }
-
-        .filters {
-            flex-wrap: wrap;
-        }
-
-        @media (max-width: 992px) {
-            .filters {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                background: white;
-                padding: 1rem;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                z-index: 1001;
-            }
-        }
-
-        /* Style for Google Places Autocomplete dropdown */
-        .pac-container {
-            border-radius: 8px;
-            margin-top: 4px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .pac-item {
-            padding: 8px 12px;
-            cursor: pointer;
-        }
-
-        .pac-item:hover {
-            background-color: #f8f9fa;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">Zillow Clone</a>
+            <a class="navbar-brand" href="#">Obsidian Nexus</a>
             <div class="search-container d-flex">
                 <i class="fas fa-search search-icon"></i>
                 <input class="form-control me-2" type="search" id="search-input" 
                     placeholder="Enter an address, neighborhood, city, or ZIP code" aria-label="Search">
                 <button class="btn btn-outline-primary rounded-pill" type="button" onclick="handleSearch()">Search</button>
             </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="darkModeToggle">
+                <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+            </div>
         </div>
     </nav>
+
+    <!-- Add this right after the navbar, before the main content -->
+    <div class="map-controls">
+        <select id="map-style-switcher" class="form-select form-select-sm">
+            <option value="osm">OpenStreetMap</option>
+            <option value="satellite">Satellite</option>
+            <option value="dark">Dark Mode</option>
+            <option value="terrain">Terrain</option>
+            <option value="topo">Topographic</option>
+        </select>
+    </div>
 
     <!-- Main Content -->
     <div class="container-fluid p-0">
@@ -359,21 +78,72 @@
         let markers = [];
         let searchTimeout;
         let originalListings = null;
+        let currentTileLayer = null;
         
+        const mapStyles = {
+            osm: {
+                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                options: {
+                    attribution: '© OpenStreetMap contributors'
+                }
+            },
+            satellite: {
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                options: {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                }
+            },
+            dark: {
+                url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
+                options: {
+                    attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
+                }
+            },
+            terrain: {
+                url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png',
+                options: {
+                    attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>'
+                }
+            },
+            topo: {
+                url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+                options: {
+                    attribution: '© OpenTopoMap contributors'
+                }
+            }
+        };
+
         // Initialize map
         function initMap() {
             map = L.map('map', {
                 zoomControl: false
             }).setView([40.7128, -74.0060], 13);
             
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-            
             // Add zoom control to the right
             L.control.zoom({
                 position: 'topright'
             }).addTo(map);
+
+            // Set initial map style to dark mode
+            setMapStyle('dark');
+            
+            // Update the style switcher to show dark as selected
+            document.getElementById('map-style-switcher').value = 'dark';
+
+            // Add style switcher event listener
+            document.getElementById('map-style-switcher').addEventListener('change', (e) => {
+                setMapStyle(e.target.value);
+            });
+        }
+
+        function setMapStyle(styleName) {
+            const style = mapStyles[styleName];
+            
+            if (currentTileLayer) {
+                map.removeLayer(currentTileLayer);
+            }
+            
+            currentTileLayer = L.tileLayer(style.url, style.options).addTo(map);
         }
 
         // Mobile sidebar toggle functionality
@@ -489,20 +259,41 @@
                 const properties = feature.properties;
                 const coordinates = feature.geometry.coordinates;
 
-                // Create custom marker icon
+                // Create custom marker icon with color based on availability
+                const markerColor = properties.availability ? '#00C851' : '#ff4444';
                 const icon = L.divIcon({
                     className: 'custom-marker',
-                    html: `<div style="width: 24px; height: 24px;"></div>`,
-                    iconSize: [24, 24]
+                    html: `<div style="
+                        width: 12px;
+                        height: 12px;
+                        background-color: ${markerColor};
+                        border-radius: 50%;
+                        border: 2px solid white;
+                        box-shadow: 0 0 4px rgba(0,0,0,0.3);
+                    "></div>`,
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6]
                 });
 
                 // Add marker to map
                 const marker = L.marker([coordinates[1], coordinates[0]], { icon })
-                    .bindPopup(createPopupContent(properties))
+                    .bindPopup(createPopupContent(properties), {
+                        closeButton: true,
+                        closeOnClick: true,
+                        autoClose: true
+                    })
                     .addTo(map);
                 
+                // Remove the click event that highlights the card
                 marker.on('click', () => {
-                    highlightCard(index);
+                    marker.openPopup();
+                });
+                
+                // Add popup close event
+                marker.on('popupclose', () => {
+                    // Optional: deselect the card when popup closes
+                    const cards = document.querySelectorAll('.property-card');
+                    cards.forEach(card => card.classList.remove('active'));
                 });
                 
                 markers.push(marker);
@@ -617,6 +408,8 @@
         window.onload = function() {
             initMap();
             fetchListings();
+            enableDarkMode(); // Enable dark mode by default
+            document.getElementById('darkModeToggle').checked = true; // Set the toggle to checked
         };
 
         function applyFilters() {
@@ -684,6 +477,28 @@
                 timeout = setTimeout(later, wait);
             };
         }
+
+        function enableDarkMode() {
+            document.body.classList.add('dark-mode');
+            document.querySelector('.navbar').classList.add('dark-mode');
+            document.querySelector('.listing-sidebar').classList.add('dark-mode');
+            document.querySelectorAll('.property-card').forEach(card => card.classList.add('dark-mode'));
+            document.querySelectorAll('.form-control, .form-select').forEach(input => input.classList.add('dark-mode'));
+            document.querySelector('.map-controls').classList.add('dark-mode');
+            document.querySelector('.toggle-view').classList.add('dark-mode');
+            document.querySelectorAll('.btn-outline-primary').forEach(btn => btn.classList.add('dark-mode'));
+        }
+
+        document.getElementById('darkModeToggle').addEventListener('change', function() {
+            const isDarkMode = document.body.classList.toggle('dark-mode');
+            document.querySelector('.navbar').classList.toggle('dark-mode', isDarkMode);
+            document.querySelector('.listing-sidebar').classList.toggle('dark-mode', isDarkMode);
+            document.querySelectorAll('.property-card').forEach(card => card.classList.toggle('dark-mode', isDarkMode));
+            document.querySelectorAll('.form-control, .form-select').forEach(input => input.classList.toggle('dark-mode', isDarkMode));
+            document.querySelector('.map-controls').classList.toggle('dark-mode', isDarkMode);
+            document.querySelector('.toggle-view').classList.toggle('dark-mode', isDarkMode);
+            document.querySelectorAll('.btn-outline-primary').forEach(btn => btn.classList.toggle('dark-mode', isDarkMode));
+        });
     </script>
 </body>
 </html> 
