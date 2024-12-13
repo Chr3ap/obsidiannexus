@@ -102,14 +102,9 @@
                         }
                     },
                     dark: {
-                        // Fallback to a different dark mode provider if Jawg fails
-                        url: config.mapApiKey ? 
-                            `https://tile.jawg.io/jawg-dark/{z}/{x}/{y}{r}.png?access-token=${config.mapApiKey}` :
-                            'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                        url: `https://tile.jawg.io/jawg-dark/{z}/{x}/{y}{r}.png?access-token=${config.mapApiKey}`,
                         options: {
-                            attribution: config.mapApiKey ?
-                                '<a href="http://jawg.io" title="Tiles Courtesy of Jawg Maps" target="_blank">&copy; <b>Jawg</b>Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' :
-                                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                            attribution: '<a href="http://jawg.io" title="Tiles Courtesy of Jawg Maps" target="_blank">&copy; <b>Jawg</b>Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                             minZoom: 0,
                             maxZoom: 22,
                             subdomains: 'abcd'
