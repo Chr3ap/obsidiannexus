@@ -243,6 +243,20 @@
                 font-size: 0.9rem;
             }
         }
+
+        .loading-overlay, .error-message {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .loading-overlay.active, .error-message.active {
+            display: block;
+        }
+
+        .error-message {
+            color: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -375,21 +389,34 @@
         async function fetchListings() {
             const loadingOverlay = document.querySelector('.loading-overlay');
             const errorMessage = document.getElementById('error-message');
+            const container = document.getElementById('listings-container');
             
             try {
-                loadingOverlay.classList.add('active');
-                errorMessage.classList.remove('active');
+                // Show loading, hide error and clear container
+                loadingOverlay.style.display = 'block';
+                errorMessage.style.display = 'none';
+                container.innerHTML = '';
                 
                 const response = await fetch('/api/listings');
                 if (!response.ok) throw new Error('Failed to fetch listings');
                 
                 const data = await response.json();
+                
+                if (!data.features || data.features.length === 0) {
+                    errorMessage.textContent = 'No listings found.';
+                    errorMessage.style.display = 'block';
+                    return;
+                }
+                
                 displayListings(data);
+                errorMessage.style.display = 'none';
+                
             } catch (error) {
                 console.error('Error fetching listings:', error);
-                errorMessage.classList.add('active');
+                errorMessage.style.display = 'block';
+                container.innerHTML = '';
             } finally {
-                loadingOverlay.classList.remove('active');
+                loadingOverlay.style.display = 'none';
             }
         }
 
