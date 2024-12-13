@@ -3,6 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const compression = require('compression');
+require('dotenv').config();
 
 const app = express();
 const port = 3000;
@@ -13,7 +14,14 @@ app.use(express.json({limit: '50mb'}));
 app.use(cors());
 
 // Serve static files from public directory
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Add endpoint to serve the API key
+app.get('/api/config', (req, res) => {
+    res.json({
+        mapApiKey: process.env.JAWG_API_KEY
+    });
+});
 
 // Serve index.html for the root path
 app.get('/', (req, res) => {
@@ -55,6 +63,11 @@ app.get('/api/listings', (req, res) => {
             message: error.message
         });
     }
+});
+
+// Add a catch-all route for SPA
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Start server
