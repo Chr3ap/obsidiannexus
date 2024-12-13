@@ -1,1 +1,77 @@
- 
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-81.7802187, 27.9821164]
+      },
+      "properties": {
+        "property_id": "115676",
+        "location_name": "160 Brad Circle, Winter Haven, FL 33880",
+        "price": 179999.0,
+        "status": "For Sale",
+        "bedrooms": 3.0,
+        "bathrooms": 2.0,
+        "sq_footage": 1880,
+        "state": "FL",
+        "city": "Winter Haven",
+        "county": "Polk County",
+        "description": "Beautiful 3 bed, 2 bath home in Winter Haven",
+        "year_built": 1998,
+        "zipcode": "33880",
+        "deal_type": "Single Family",
+        "availability": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-82.4572769, 28.0522456]
+      },
+      "properties": {
+        "property_id": "115677",
+        "location_name": "2234 Lake Ave, Tampa, FL 33607",
+        "price": 299999.0,
+        "status": "For Sale",
+        "bedrooms": 4.0,
+        "bathrooms": 3.0,
+        "sq_footage": 2200,
+        "state": "FL",
+        "city": "Tampa",
+        "county": "Hillsborough County",
+        "description": "Spacious 4 bed, 3 bath home in Tampa",
+        "year_built": 2005,
+        "zipcode": "33607",
+        "deal_type": "Single Family",
+        "availability": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-81.3792365, 28.5383355]
+      },
+      "properties": {
+        "property_id": "115678",
+        "location_name": "789 Orange Ave, Orlando, FL 32801",
+        "price": 425000.0,
+        "status": "Pending",
+        "bedrooms": 3.0,
+        "bathrooms": 2.5,
+        "sq_footage": 1950,
+        "state": "FL",
+        "city": "Orlando",
+        "county": "Orange County",
+        "description": "Modern 3 bed, 2.5 bath townhouse in downtown Orlando",
+        "year_built": 2015,
+        "zipcode": "32801",
+        "deal_type": "Townhouse",
+        "availability": false
+      }
+    }
+  ]
+}

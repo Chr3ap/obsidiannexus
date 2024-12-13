@@ -2,20 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 
 const app = express();
 const port = 3000;
 
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
-});
-
-// Apply middleware in correct order
+// Apply middleware
 app.use(compression());
-app.use(limiter);
 app.use(express.json({limit: '50mb'}));
 app.use(cors());
 
@@ -28,9 +21,10 @@ app.get('/', (req, res) => {
 });
 
 // Endpoint to serve the GeoJSON data
-app.get('/api/listings', async (req, res) => {
+app.get('/api/listings', (req, res) => {
     try {
         const geoJsonPath = path.join(__dirname, 'listings.geojson');
+        console.log('Attempting to read file from:', geoJsonPath);
         
         // Check if file exists
         if (!fs.existsSync(geoJsonPath)) {
@@ -40,7 +34,10 @@ app.get('/api/listings', async (req, res) => {
 
         // Read and parse the file
         const data = fs.readFileSync(geoJsonPath, 'utf8');
+        console.log('Successfully read file, size:', data.length, 'bytes');
+        
         const parsedData = JSON.parse(data);
+        console.log('Successfully parsed JSON');
         
         // Validate GeoJSON structure
         if (!parsedData.type || !parsedData.features) {
@@ -52,36 +49,25 @@ app.get('/api/listings', async (req, res) => {
         
         // Send response with proper headers
         res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         res.json(parsedData);
         
     } catch (error) {
-        console.error('Error reading GeoJSON file:', error);
+        console.error('Detailed error:', error);
         res.status(500).json({ 
             error: 'Failed to load listings data',
-            message: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            message: error.message
         });
     }
-});
-
-// Handle 404 errors
-app.use((req, res) => {
-    res.status(404).json({ error: 'Not found' });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Server error:', err);
-    res.status(500).json({ 
-        error: 'Something went wrong!',
-        message: err.message,
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
 });
 
 // Start server
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
     console.log('Current directory:', __dirname);
+    
+    // Check if file exists on startup
+    const geoJsonPath = path.join(__dirname, 'listings.geojson');
+    console.log('Checking for listings.geojson at:', geoJsonPath);
+    console.log('File exists:', fs.existsSync(geoJsonPath));
 }); 
