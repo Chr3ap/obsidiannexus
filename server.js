@@ -19,7 +19,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Add endpoint to serve the API key
 app.get('/api/config', (req, res) => {
     res.json({
-        mapApiKey: process.env.JAWG_API_KEY
+        mapApiKey: process.env.JAWG_ACCESS_TOKEN
     });
 });
 
