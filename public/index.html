@@ -429,16 +429,31 @@
 
         function focusListing(index) {
             const marker = markers[index];
-            map.setView(marker.getLatLng(), 16);
-            marker.openPopup();
             
-            // Close mobile menu when a listing is selected
+            // Close mobile menu first with a slight delay to allow smooth animation
             if (window.innerWidth <= 768) {
                 const menu = document.querySelector('.mobile-menu');
                 const btn = document.querySelector('.mobile-menu-btn');
+                
                 menu.classList.remove('active');
                 btn.querySelector('i').classList.remove('fa-times');
                 btn.querySelector('i').classList.add('fa-bars');
+                
+                // Wait for menu animation to complete before moving map
+                setTimeout(() => {
+                    map.setView(marker.getLatLng(), 16, {
+                        animate: true,
+                        duration: 1
+                    });
+                    marker.openPopup();
+                }, 300); // Match this with your CSS transition duration
+            } else {
+                // On desktop, just move the map immediately
+                map.setView(marker.getLatLng(), 16, {
+                    animate: true,
+                    duration: 1
+                });
+                marker.openPopup();
             }
             
             highlightCard(index);
