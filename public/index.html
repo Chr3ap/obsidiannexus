@@ -48,7 +48,7 @@
                     <div class="handle"></div>
                     <h5 class="text-center mb-0">Property Listings</h5>
                 </div>
-                <div id="listings-container" class="p-3">
+                <div id="desktop-listings-container" class="p-3">
                     <!-- Listings will be dynamically inserted here -->
                 </div>
                 <div class="loading-overlay">
@@ -72,6 +72,20 @@
     <button class="toggle-view" aria-label="Toggle View">
         <i class="fas fa-list"></i>
     </button>
+
+    <!-- Mobile menu button -->
+    <button class="mobile-menu-btn d-md-none" aria-label="Menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Mobile menu -->
+    <div class="mobile-menu">
+        <div class="listing-sidebar">
+            <div id="mobile-listings-container" class="p-3">
+                <!-- Listings will be dynamically inserted here -->
+            </div>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
@@ -128,7 +142,8 @@
         // Initialize map
         function initMap() {
             map = L.map('map', {
-                zoomControl: false
+                zoomControl: false,
+                attributionControl: false
             }).setView([40.7128, -74.0060], 13);
             
             // Add zoom control to the right
@@ -226,12 +241,14 @@
         async function fetchListings() {
             const loadingOverlay = document.querySelector('.loading-overlay');
             const errorMessage = document.getElementById('error-message');
-            const container = document.getElementById('listings-container');
+            const desktopContainer = document.getElementById('desktop-listings-container');
+            const mobileContainer = document.getElementById('mobile-listings-container');
             
             try {
                 loadingOverlay.style.display = 'block';
                 errorMessage.style.display = 'none';
-                container.innerHTML = '';
+                desktopContainer.innerHTML = '';
+                mobileContainer.innerHTML = '';
                 
                 const response = await fetch('/api/listings');
                 if (!response.ok) throw new Error('Failed to fetch listings');
@@ -240,7 +257,8 @@
                 originalListings = data; // Store original listings
                 
                 if (!data.features || data.features.length === 0) {
-                    errorMessage.textContent = 'No listings found.';
+                    const noListingsMessage = 'No listings found.';
+                    errorMessage.textContent = noListingsMessage;
                     errorMessage.style.display = 'block';
                     return;
                 }
@@ -251,7 +269,8 @@
             } catch (error) {
                 console.error('Error fetching listings:', error);
                 errorMessage.style.display = 'block';
-                container.innerHTML = '';
+                desktopContainer.innerHTML = '';
+                mobileContainer.innerHTML = '';
             } finally {
                 loadingOverlay.style.display = 'none';
             }
@@ -259,15 +278,19 @@
 
         // Display listings on both the sidebar and map
         function displayListings(geojson) {
-            const container = document.getElementById('listings-container');
-            container.innerHTML = '';
+            const desktopContainer = document.getElementById('desktop-listings-container');
+            const mobileContainer = document.getElementById('mobile-listings-container');
+            desktopContainer.innerHTML = '';
+            mobileContainer.innerHTML = '';
 
             // Clear existing markers
             markers.forEach(marker => map.removeLayer(marker));
             markers = [];
 
             if (!geojson.features || !geojson.features.length) {
-                container.innerHTML = '<div class="alert alert-info">No properties found.</div>';
+                const noResults = '<div class="alert alert-info">No properties found.</div>';
+                desktopContainer.innerHTML = noResults;
+                mobileContainer.innerHTML = noResults;
                 return;
             }
 
@@ -314,8 +337,10 @@
                 
                 markers.push(marker);
 
-                // Add listing card to sidebar
-                container.innerHTML += createListingCard(properties, index);
+                // Add listing card to both containers
+                const cardHtml = createListingCard(properties, index);
+                desktopContainer.innerHTML += cardHtml;
+                mobileContainer.innerHTML += cardHtml;
             });
 
             // Fit map bounds to show all markers
@@ -407,9 +432,13 @@
             map.setView(marker.getLatLng(), 16);
             marker.openPopup();
             
-            // On mobile, expand the sidebar when a listing is selected
+            // Close mobile menu when a listing is selected
             if (window.innerWidth <= 768) {
-                document.querySelector('.listing-sidebar').classList.add('expanded');
+                const menu = document.querySelector('.mobile-menu');
+                const btn = document.querySelector('.mobile-menu-btn');
+                menu.classList.remove('active');
+                btn.querySelector('i').classList.remove('fa-times');
+                btn.querySelector('i').classList.add('fa-bars');
             }
             
             highlightCard(index);
@@ -569,6 +598,34 @@
                 console.error('Geocoding error:', error);
             }
         }
+
+        // Add this right after your map initialization code
+        window.addEventListener('load', function() {
+            const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+            const mobileMenu = document.querySelector('.mobile-menu');
+            
+            if (mobileMenuBtn && mobileMenu) {
+                console.log('Mobile menu elements found'); // Debug log
+                
+                mobileMenuBtn.addEventListener('click', function(e) {
+                    console.log('Mobile menu button clicked'); // Debug log
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    mobileMenu.classList.toggle('active');
+                    const icon = this.querySelector('i');
+                    if (icon) {
+                        icon.classList.toggle('fa-bars');
+                        icon.classList.toggle('fa-times');
+                    }
+                });
+            } else {
+                console.log('Mobile menu elements not found:', { 
+                    btn: mobileMenuBtn, 
+                    menu: mobileMenu 
+                }); // Debug log
+            }
+        });
     </script>
 </body>
 </html> 
