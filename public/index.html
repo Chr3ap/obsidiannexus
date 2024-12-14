@@ -435,20 +435,25 @@
                 const menu = document.querySelector('.mobile-menu');
                 const btn = document.querySelector('.mobile-menu-btn');
                 
-                menu.classList.remove('active');
-                btn.querySelector('i').classList.remove('fa-times');
-                btn.querySelector('i').classList.add('fa-bars');
+                // Add transparent class first
+                menu.classList.add('transparent');
                 
-                // Wait for menu animation to complete before moving map
+                // Wait a bit, then close the menu
                 setTimeout(() => {
+                    menu.classList.remove('active');
+                    menu.classList.remove('transparent'); // Remove transparent class after closing
+                    btn.querySelector('i').classList.remove('fa-times');
+                    btn.querySelector('i').classList.add('fa-bars');
+                    
+                    // Move map to location
                     map.setView(marker.getLatLng(), 16, {
                         animate: true,
                         duration: 1
                     });
                     marker.openPopup();
-                }, 300); // Match this with your CSS transition duration
+                }, 300);
             } else {
-                // On desktop, just move the map immediately
+                // Desktop behavior remains the same
                 map.setView(marker.getLatLng(), 16, {
                     animate: true,
                     duration: 1
