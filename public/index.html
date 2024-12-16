@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
 </head>
 <body>
     <!-- Navigation -->
@@ -114,6 +116,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script src="/js/utils.js"></script>
     <script>
         let map;
@@ -122,6 +125,7 @@
         let originalListings = null;
         let currentTileLayer = null;
         let mapStyles;
+        let markerClusterGroup;
         
         // Add this function to initialize mapStyles after fetching the API key
         async function initializeMapStyles() {
@@ -172,7 +176,12 @@
                 console.log('Initializing map');
                 map = L.map('map', {
                     zoomControl: false,
-                    attributionControl: false
+                    attributionControl: false,
+                    preferCanvas: true,
+                    wheelDebounceTime: 150,
+                    wheelPxPerZoomLevel: 120,
+                    tap: false,
+                    bounceAtZoomLimits: false
                 });
 
                 // Set initial view to continental US
@@ -193,6 +202,17 @@
                 // Set initial map style
                 setMapStyle('dark');
                 
+                // Add clustering for markers
+                markerClusterGroup = L.markerClusterGroup({
+                    chunkedLoading: true,
+                    maxClusterRadius: 50,
+                    spiderfyOnMaxZoom: false,
+                    disableClusteringAtZoom: 16,
+                    animate: false
+                });
+                
+                map.addLayer(markerClusterGroup);
+
                 // Add map load event listener
                 map.on('load', () => {
                     console.log('Map loaded');
@@ -281,117 +301,105 @@
         document.getElementById('search-input').addEventListener('input', debounce(handleSearch, 500));
 
         // Fetch and display listings with loading state
-        async function fetchListings() {
+        function fetchListings() {
             const loadingOverlay = document.querySelector('.loading-overlay');
             const errorMessage = document.getElementById('error-message');
             const desktopContainer = document.getElementById('desktop-listings-container');
             const mobileContainer = document.getElementById('mobile-listings-container');
             
-            try {
-                loadingOverlay.style.display = 'flex';
-                errorMessage.style.display = 'none';
-                
-                // Clear existing containers
-                desktopContainer.innerHTML = '';
-                mobileContainer.innerHTML = '';
-                
-                // Clear existing markers
-                markers.forEach(marker => map.removeLayer(marker));
-                markers = [];
-                
-                let totalFeatures = 0;
-                let validMarkers = [];
-
-                await loadGeoJsonInChunks('/api/listings', async (chunk) => {
-                    console.log('Raw chunk data:', JSON.stringify(chunk, null, 2));
+            let processedCount = 0;
+            const BATCH_SIZE = 10; // Process 10 listings at a time
+            
+            return new Promise(async (resolve, reject) => {
+                try {
+                    loadingOverlay.style.display = 'flex';
+                    errorMessage.style.display = 'none';
                     
-                    // Filter for available properties only
-                    const availableFeatures = chunk.features.filter(feature => {
-                        console.log('Feature being processed:', {
-                            properties: feature.properties,
-                            hasGeometry: !!feature.geometry,
-                            hasCoordinates: !!feature.geometry?.coordinates,
-                            bedrooms: feature.properties?.bedrooms,
-                            bathrooms: feature.properties?.bathrooms,
-                            sqFootage: feature.properties?.sq_footage
-                        });
-                        return feature.properties.status === "For Sale";
-                    });
+                    // Clear existing containers
+                    desktopContainer.innerHTML = '';
+                    mobileContainer.innerHTML = '';
                     
-                    console.log('Available features:', availableFeatures);
+                    // Clear existing markers
+                    if (markerClusterGroup) {
+                        markerClusterGroup.clearLayers();
+                    }
+                    markers = [];
+                    
+                    let validMarkers = [];
+                    let bounds = L.latLngBounds();
 
-                    availableFeatures.forEach((feature, index) => {
-                        try {
-                            console.log('Processing feature:', {
-                                fullFeature: feature,
-                                propertyDetails: {
-                                    bedrooms: feature.properties?.bedrooms,
-                                    bathrooms: feature.properties?.bathrooms,
-                                    sqFootage: feature.properties?.sq_footage
+                    await loadGeoJsonInChunks('/api/listings', async (chunk) => {
+                        // Filter for available properties
+                        const availableFeatures = chunk.features.filter(feature => 
+                            feature.properties.status === "For Sale" && 
+                            feature.geometry?.coordinates
+                        );
+
+                        // Process in smaller batches
+                        for (let i = 0; i < availableFeatures.length; i += BATCH_SIZE) {
+                            const batch = availableFeatures.slice(i, i + BATCH_SIZE);
+                            
+                            await new Promise(resolve => setTimeout(resolve, 0)); // Let UI breathe
+                            
+                            batch.forEach(feature => {
+                                try {
+                                    const propertyData = {
+                                        ...feature.properties,
+                                        property_id: feature.properties.property_id,
+                                        location_name: feature.properties.location_name,
+                                        price: feature.properties.price,
+                                        status: feature.properties.status,
+                                        bedrooms: feature.properties.bedrooms,
+                                        bathrooms: feature.properties.bathrooms,
+                                        sq_footage: feature.properties.sq_footage,
+                                        year_built: feature.properties.year_built,
+                                        city: feature.properties.city,
+                                        state: feature.properties.state,
+                                        county: feature.properties.county,
+                                        zipcode: feature.properties.zipcode,
+                                        deal_type: feature.properties.deal_type
+                                    };
+
+                                    const marker = createMarker(feature.geometry.coordinates, propertyData);
+                                    if (marker) {
+                                        validMarkers.push(marker);
+                                        bounds.extend(marker.getLatLng());
+                                        
+                                        const cardHtml = createListingCard(propertyData, processedCount++);
+                                        desktopContainer.insertAdjacentHTML('beforeend', cardHtml);
+                                        mobileContainer.insertAdjacentHTML('beforeend', cardHtml);
+                                    }
+                                } catch (error) {
+                                    console.error('Error processing feature:', error);
                                 }
                             });
 
-                            if (!feature.geometry?.coordinates || !feature.properties) {
-                                console.error('Invalid feature:', feature);
-                                return;
+                            // Update loading progress
+                            const progress = document.querySelector('.loading-overlay .progress');
+                            if (progress) {
+                                progress.textContent = `Loading properties... ${processedCount} loaded`;
                             }
-
-                            // Create a complete properties object with all fields
-                            const propertyData = {
-                                ...feature.properties,  // Spread all properties
-                                property_id: feature.properties.property_id,
-                                location_name: feature.properties.location_name,
-                                price: feature.properties.price,
-                                status: feature.properties.status,
-                                bedrooms: feature.properties.bedrooms,
-                                bathrooms: feature.properties.bathrooms,
-                                sq_footage: feature.properties.sq_footage,
-                                year_built: feature.properties.year_built,
-                                city: feature.properties.city,
-                                state: feature.properties.state,
-                                county: feature.properties.county,
-                                zipcode: feature.properties.zipcode,
-                                deal_type: feature.properties.deal_type
-                            };
-
-                            console.log('Complete property data:', propertyData);
-
-                            const marker = createMarker(feature.geometry.coordinates, propertyData);
-                            if (marker) {
-                                validMarkers.push(marker);
-                                const cardHtml = createListingCard(propertyData, totalFeatures + index);
-                                desktopContainer.insertAdjacentHTML('beforeend', cardHtml);
-                                mobileContainer.insertAdjacentHTML('beforeend', cardHtml);
-                            }
-                        } catch (error) {
-                            console.error('Error processing feature:', error, feature);
                         }
                     });
-                    
-                    totalFeatures += availableFeatures.length;
-                });
 
-                // Update markers array with valid markers
-                markers = validMarkers;
-                console.log('Total valid markers created:', markers.length);
+                    // Update markers array with valid markers
+                    markers = validMarkers;
 
-                // Fit map to markers if we have any
-                if (markers.length > 0) {
-                    const group = L.featureGroup(markers);
-                    map.fitBounds(group.getBounds());
-                } else {
-                    console.warn('No markers to display on map');
-                    desktopContainer.innerHTML = '<div class="alert alert-info">No properties available.</div>';
-                    mobileContainer.innerHTML = '<div class="alert alert-info">No properties available.</div>';
+                    // Fit map to bounds if we have markers
+                    if (markers.length > 0) {
+                        map.fitBounds(bounds);
+                    }
+
+                    resolve();
+                } catch (error) {
+                    console.error('Error in fetchListings:', error);
+                    errorMessage.textContent = error.message;
+                    errorMessage.style.display = 'block';
+                    reject(error);
+                } finally {
+                    loadingOverlay.style.display = 'none';
                 }
-                
-            } catch (error) {
-                console.error('Error in fetchListings:', error);
-                errorMessage.textContent = error.message;
-                errorMessage.style.display = 'block';
-            } finally {
-                loadingOverlay.style.display = 'none';
-            }
+            });
         }
 
         // Display listings on both the sidebar and map
@@ -868,45 +876,53 @@
             }
         });
 
-        // Add a helper function to create markers
+        // Create a marker icon once and reuse it
+        const availableMarkerIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                width: 12px;
+                height: 12px;
+                background-color: #00C851;
+                border-radius: 50%;
+                border: 2px solid white;
+                box-shadow: 0 0 4px rgba(0,0,0,0.3);
+            "></div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+        });
+
+        const soldMarkerIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                width: 12px;
+                height: 12px;
+                background-color: #ff4444;
+                border-radius: 50%;
+                border: 2px solid white;
+                box-shadow: 0 0 4px rgba(0,0,0,0.3);
+            "></div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+        });
+
         function createMarker(coordinates, properties) {
             try {
-                console.log('createMarker input:', {
-                    coordinates,
-                    properties,
-                    propertyDetails: {
-                        bedrooms: properties?.bedrooms,
-                        bathrooms: properties?.bathrooms,
-                        sqFootage: properties?.sq_footage
-                    }
-                });
-                
-                // Ensure coordinates are in the correct order [lng, lat]
                 if (!Array.isArray(coordinates) || coordinates.length !== 2) {
                     console.error('Invalid coordinates:', coordinates);
                     return null;
                 }
 
-                const markerColor = properties.status === "Sold" ? '#ff4444' : '#00C851';
-                const icon = L.divIcon({
-                    className: 'custom-marker',
-                    html: `<div style="
-                        width: 12px;
-                        height: 12px;
-                        background-color: ${markerColor};
-                        border-radius: 50%;
-                        border: 2px solid white;
-                        box-shadow: 0 0 4px rgba(0,0,0,0.3);
-                    "></div>`,
-                    iconSize: [12, 12],
-                    iconAnchor: [6, 6]
+                const icon = properties.status === "Sold" ? soldMarkerIcon : availableMarkerIcon;
+                const marker = L.marker([coordinates[1], coordinates[0]], { 
+                    icon,
+                    interactive: true,
+                    bubblingMouseEvents: false
                 });
-
-                // Store complete properties on marker
-                const marker = L.marker([coordinates[1], coordinates[0]], { icon });
+                
                 marker.properties = properties;
 
-                marker.bindPopup(createPopupContent(properties), {
+                // Create popup content only when needed
+                marker.bindPopup(() => createPopupContent(properties), {
                     closeButton: true,
                     closeOnClick: true,
                     autoClose: true,
@@ -914,9 +930,8 @@
                     maxWidth: 'auto'
                 });
 
-                marker.addTo(map);
-                console.log('Marker created and added to map');
-                
+                // Add to cluster group instead of directly to map
+                markerClusterGroup.addLayer(marker);
                 return marker;
             } catch (error) {
                 console.error('Error creating marker:', error);
