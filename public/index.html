@@ -20,6 +20,31 @@
                     placeholder="Enter an address, neighborhood, city, or ZIP code" aria-label="Search">
                 <button class="btn btn-outline-primary rounded-pill" type="button" onclick="handleSearch()">Search</button>
             </div>
+            <div class="filters-container">
+                <select id="price-filter" class="form-select form-select-sm">
+                    <option value="">Price (Any)</option>
+                    <option value="0-100000">Under $100k</option>
+                    <option value="100000-200000">$100k - $200k</option>
+                    <option value="200000-300000">$200k - $300k</option>
+                    <option value="300000-500000">$300k - $500k</option>
+                    <option value="500000">$500k+</option>
+                </select>
+                
+                <select id="beds-filter" class="form-select form-select-sm">
+                    <option value="">Beds (Any)</option>
+                    <option value="1">1+</option>
+                    <option value="2">2+</option>
+                    <option value="3">3+</option>
+                    <option value="4">4+</option>
+                    <option value="5">5+</option>
+                </select>
+                
+                <select id="status-filter" class="form-select form-select-sm">
+                    <option value="">Status (Any)</option>
+                    <option value="For Sale">For Sale</option>
+                    <option value="Sold">Sold</option>
+                </select>
+            </div>
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="darkModeToggle">
                 <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
@@ -55,6 +80,7 @@
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
+                    <div class="progress mt-2">Loading properties...</div>
                 </div>
                 <div class="error-message" id="error-message">
                     Unable to load listings. Please try again later.
@@ -88,6 +114,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="/js/utils.js"></script>
     <script>
         let map;
         let markers = [];
@@ -141,31 +168,47 @@
 
         // Initialize map
         function initMap() {
-            map = L.map('map', {
-                zoomControl: false,
-                attributionControl: false
-            }).setView([40.7128, -74.0060], 13);
-            
-            // Add zoom control to the right
-            const zoomControl = L.control.zoom({
-                position: 'topright'
-            }).addTo(map);
+            try {
+                console.log('Initializing map');
+                map = L.map('map', {
+                    zoomControl: false,
+                    attributionControl: false
+                });
 
-            // Move the zoom control into the map-controls div
-            const mapControls = document.querySelector('.map-controls');
-            const zoomContainer = document.querySelector('.leaflet-control-zoom');
-            mapControls.appendChild(zoomContainer);
+                // Set initial view to continental US
+                map.setView([39.8283, -98.5795], 4);
+                
+                // Add zoom control to the right
+                const zoomControl = L.control.zoom({
+                    position: 'topright'
+                }).addTo(map);
 
-            // Set initial map style to dark mode
-            setMapStyle('dark');
-            
-            // Update the style switcher to show dark as selected
-            document.getElementById('map-style-switcher').value = 'dark';
+                // Move the zoom control into the map-controls div
+                const mapControls = document.querySelector('.map-controls');
+                const zoomContainer = document.querySelector('.leaflet-control-zoom');
+                if (mapControls && zoomContainer) {
+                    mapControls.appendChild(zoomContainer);
+                }
 
-            // Add style switcher event listener
-            document.getElementById('map-style-switcher').addEventListener('change', (e) => {
-                setMapStyle(e.target.value);
-            });
+                // Set initial map style
+                setMapStyle('dark');
+                
+                // Add map load event listener
+                map.on('load', () => {
+                    console.log('Map loaded');
+                });
+                
+                console.log('Map initialized successfully');
+                return true;
+            } catch (error) {
+                console.error('Map initialization failed:', error);
+                const errorMessage = document.getElementById('error-message');
+                if (errorMessage) {
+                    errorMessage.textContent = 'Failed to initialize map. Please refresh the page.';
+                    errorMessage.style.display = 'block';
+                }
+                return false;
+            }
         }
 
         function setMapStyle(styleName) {
@@ -245,32 +288,107 @@
             const mobileContainer = document.getElementById('mobile-listings-container');
             
             try {
-                loadingOverlay.style.display = 'block';
+                loadingOverlay.style.display = 'flex';
                 errorMessage.style.display = 'none';
+                
+                // Clear existing containers
                 desktopContainer.innerHTML = '';
                 mobileContainer.innerHTML = '';
                 
-                const response = await fetch('/api/listings');
-                if (!response.ok) throw new Error('Failed to fetch listings');
+                // Clear existing markers
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
                 
-                const data = await response.json();
-                originalListings = data; // Store original listings
-                
-                if (!data.features || data.features.length === 0) {
-                    const noListingsMessage = 'No listings found.';
-                    errorMessage.textContent = noListingsMessage;
-                    errorMessage.style.display = 'block';
-                    return;
+                let totalFeatures = 0;
+                let validMarkers = [];
+
+                await loadGeoJsonInChunks('/api/listings', async (chunk) => {
+                    console.log('Raw chunk data:', JSON.stringify(chunk, null, 2));
+                    
+                    // Filter for available properties only
+                    const availableFeatures = chunk.features.filter(feature => {
+                        console.log('Feature being processed:', {
+                            properties: feature.properties,
+                            hasGeometry: !!feature.geometry,
+                            hasCoordinates: !!feature.geometry?.coordinates,
+                            bedrooms: feature.properties?.bedrooms,
+                            bathrooms: feature.properties?.bathrooms,
+                            sqFootage: feature.properties?.sq_footage
+                        });
+                        return feature.properties.status === "For Sale";
+                    });
+                    
+                    console.log('Available features:', availableFeatures);
+
+                    availableFeatures.forEach((feature, index) => {
+                        try {
+                            console.log('Processing feature:', {
+                                fullFeature: feature,
+                                propertyDetails: {
+                                    bedrooms: feature.properties?.bedrooms,
+                                    bathrooms: feature.properties?.bathrooms,
+                                    sqFootage: feature.properties?.sq_footage
+                                }
+                            });
+
+                            if (!feature.geometry?.coordinates || !feature.properties) {
+                                console.error('Invalid feature:', feature);
+                                return;
+                            }
+
+                            // Create a complete properties object with all fields
+                            const propertyData = {
+                                ...feature.properties,  // Spread all properties
+                                property_id: feature.properties.property_id,
+                                location_name: feature.properties.location_name,
+                                price: feature.properties.price,
+                                status: feature.properties.status,
+                                bedrooms: feature.properties.bedrooms,
+                                bathrooms: feature.properties.bathrooms,
+                                sq_footage: feature.properties.sq_footage,
+                                year_built: feature.properties.year_built,
+                                city: feature.properties.city,
+                                state: feature.properties.state,
+                                county: feature.properties.county,
+                                zipcode: feature.properties.zipcode,
+                                deal_type: feature.properties.deal_type
+                            };
+
+                            console.log('Complete property data:', propertyData);
+
+                            const marker = createMarker(feature.geometry.coordinates, propertyData);
+                            if (marker) {
+                                validMarkers.push(marker);
+                                const cardHtml = createListingCard(propertyData, totalFeatures + index);
+                                desktopContainer.insertAdjacentHTML('beforeend', cardHtml);
+                                mobileContainer.insertAdjacentHTML('beforeend', cardHtml);
+                            }
+                        } catch (error) {
+                            console.error('Error processing feature:', error, feature);
+                        }
+                    });
+                    
+                    totalFeatures += availableFeatures.length;
+                });
+
+                // Update markers array with valid markers
+                markers = validMarkers;
+                console.log('Total valid markers created:', markers.length);
+
+                // Fit map to markers if we have any
+                if (markers.length > 0) {
+                    const group = L.featureGroup(markers);
+                    map.fitBounds(group.getBounds());
+                } else {
+                    console.warn('No markers to display on map');
+                    desktopContainer.innerHTML = '<div class="alert alert-info">No properties available.</div>';
+                    mobileContainer.innerHTML = '<div class="alert alert-info">No properties available.</div>';
                 }
                 
-                displayListings(data);
-                errorMessage.style.display = 'none';
-                
             } catch (error) {
-                console.error('Error fetching listings:', error);
+                console.error('Error in fetchListings:', error);
+                errorMessage.textContent = error.message;
                 errorMessage.style.display = 'block';
-                desktopContainer.innerHTML = '';
-                mobileContainer.innerHTML = '';
             } finally {
                 loadingOverlay.style.display = 'none';
             }
@@ -278,77 +396,83 @@
 
         // Display listings on both the sidebar and map
         function displayListings(geojson) {
+            console.log('displayListings called with:', {
+                type: geojson?.type,
+                featureCount: geojson?.features?.length
+            });
+            
             const desktopContainer = document.getElementById('desktop-listings-container');
             const mobileContainer = document.getElementById('mobile-listings-container');
-            desktopContainer.innerHTML = '';
-            mobileContainer.innerHTML = '';
+            
+            if (!desktopContainer || !mobileContainer) {
+                console.error('Containers not found:', {
+                    desktop: !!desktopContainer,
+                    mobile: !!mobileContainer
+                });
+                return;
+            }
 
             // Clear existing markers
             markers.forEach(marker => map.removeLayer(marker));
             markers = [];
 
-            if (!geojson.features || !geojson.features.length) {
-                const noResults = '<div class="alert alert-info">No properties found.</div>';
+            if (!geojson?.features?.length) {
+                console.warn('No features in GeoJSON data');
+                const noResults = '<div class="alert alert-info">No properties available.</div>';
                 desktopContainer.innerHTML = noResults;
                 mobileContainer.innerHTML = noResults;
                 return;
             }
 
+            // Clear existing containers
+            desktopContainer.innerHTML = '';
+            mobileContainer.innerHTML = '';
+
             geojson.features.forEach((feature, index) => {
-                const properties = feature.properties;
-                const coordinates = feature.geometry.coordinates;
+                try {
+                    if (!feature.geometry?.coordinates || !feature.properties) {
+                        console.error('Invalid feature:', feature);
+                        return;
+                    }
 
-                // Create custom marker icon with color based on availability
-                const markerColor = properties.availability ? '#00C851' : '#ff4444';
-                const icon = L.divIcon({
-                    className: 'custom-marker',
-                    html: `<div style="
-                        width: 12px;
-                        height: 12px;
-                        background-color: ${markerColor};
-                        border-radius: 50%;
-                        border: 2px solid white;
-                        box-shadow: 0 0 4px rgba(0,0,0,0.3);
-                    "></div>`,
-                    iconSize: [12, 12],
-                    iconAnchor: [6, 6]
-                });
+                    // Create a complete properties object
+                    const propertyData = {
+                        ...feature.properties,  // Spread all existing properties
+                        property_id: feature.properties.property_id,
+                        location_name: feature.properties.location_name,
+                        price: feature.properties.price,
+                        status: feature.properties.status,
+                        bedrooms: feature.properties.bedrooms,
+                        bathrooms: feature.properties.bathrooms,
+                        sq_footage: feature.properties.sq_footage,
+                        year_built: feature.properties.year_built,
+                        city: feature.properties.city,
+                        state: feature.properties.state,
+                        county: feature.properties.county,
+                        zipcode: feature.properties.zipcode,
+                        deal_type: feature.properties.deal_type
+                    };
 
-                // Add marker to map
-                const marker = L.marker([coordinates[1], coordinates[0]], { icon })
-                    .bindPopup(createPopupContent(properties), {
-                        closeButton: true,
-                        closeOnClick: true,
-                        autoClose: true
-                    })
-                    .addTo(map);
-                
-                // Remove the click event that highlights the card
-                marker.on('click', () => {
-                    marker.openPopup();
-                });
-                
-                // Add popup close event
-                marker.on('popupclose', () => {
-                    // Optional: deselect the card when popup closes
-                    const cards = document.querySelectorAll('.property-card');
-                    cards.forEach(card => card.classList.remove('active'));
-                });
-                
-                markers.push(marker);
+                    console.log('Complete property data:', propertyData);
 
-                // Add listing card to both containers
-                const cardHtml = createListingCard(properties, index);
-                desktopContainer.innerHTML += cardHtml;
-                mobileContainer.innerHTML += cardHtml;
+                    const marker = createMarker(feature.geometry.coordinates, propertyData);
+                    if (marker) {
+                        markers.push(marker);
+                        const cardHtml = createListingCard(propertyData, index);
+                        desktopContainer.insertAdjacentHTML('beforeend', cardHtml);
+                        mobileContainer.insertAdjacentHTML('beforeend', cardHtml);
+                    }
+                } catch (error) {
+                    console.error('Error processing feature:', error, feature);
+                }
             });
 
-            // Fit map bounds to show all markers
+            // Fit map to markers
             if (markers.length > 0) {
-                const group = new L.featureGroup(markers);
-                map.fitBounds(group.getBounds(), {
-                    padding: [50, 50]
-                });
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds());
+            } else {
+                console.warn('No markers to fit bounds to');
             }
         }
 
@@ -360,92 +484,169 @@
         }
 
         function createPopupContent(properties) {
-            const formattedPrice = new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            }).format(properties.price);
+            if (!properties) {
+                console.error('No properties provided for popup content');
+                return '';
+            }
 
-            return `
-                <div class="popup-content">
-                    <h6>${formattedPrice}</h6>
-                    <p>${properties.location_name}</p>
-                    <p>${properties.bedrooms} bd • ${properties.bathrooms} ba • ${properties.sq_footage.toLocaleString()} sf</p>
-                    <small class="text-muted">${properties.year_built} • ${properties.county}</small>
-                </div>
-            `;
+            try {
+                // Handle N/A or invalid price
+                const price = properties.price === "N/A" || !properties.price ? 0 : properties.price;
+                const formattedPrice = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(price);
+
+                // Handle status styling
+                const statusClass = properties.status === "Sold" ? 'status-sold' : 
+                                   properties.status === "For Sale" ? 'status-available' : 
+                                   'status-pending';
+                const statusText = properties.status || 'Unknown';
+
+                // Handle property details with proper null checks
+                const bedrooms = properties.bedrooms ? Number(properties.bedrooms) : '-';
+                const bathrooms = properties.bathrooms ? Number(properties.bathrooms) : '-';
+                const sqFootage = properties.sq_footage ? 
+                    new Intl.NumberFormat('en-US').format(Number(properties.sq_footage)) : '-';
+
+                return `
+                    <div class="card property-card popup-card">
+                        <div class="card-body">
+                            <span class="property-status ${statusClass}">${statusText}</span>
+                            <div class="property-info">
+                                <div class="property-price">${formattedPrice}</div>
+                                <div class="property-address">${properties.location_name}</div>
+                            </div>
+                            
+                            <div class="property-details">
+                                <div class="detail-item">
+                                    <div class="detail-value">${bedrooms}</div>
+                                    <div class="detail-label">Beds</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-value">${bathrooms}</div>
+                                    <div class="detail-label">Baths</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-value">${sqFootage}</div>
+                                    <div class="detail-label">Sq.Ft</div>
+                                </div>
+                            </div>
+
+                            <div class="property-meta">
+                                <div class="meta-item">
+                                    <i class="fas fa-map-marker-alt"></i> ${properties.city}, ${properties.state} ${properties.zipcode || ''}
+                                </div>
+                                ${properties.county ? `
+                                    <div class="meta-item">
+                                        <i class="fas fa-home"></i> ${properties.county}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error creating popup content:', error);
+                return '';
+            }
         }
 
         function createListingCard(properties, index) {
-            const formattedPrice = new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            }).format(properties.price);
+            if (!properties) {
+                console.error('No properties provided for card creation');
+                return '';
+            }
 
-            const statusClass = properties.availability ? 'status-available' : 'status-sold';
-            const statusText = properties.availability ? 'Available' : properties.status;
+            try {
+                // Handle N/A or invalid price
+                const price = properties.price === "N/A" || !properties.price ? 0 : properties.price;
+                const formattedPrice = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(price);
 
-            return `
-                <div class="card property-card" onclick="focusListing(${index})">
-                    <div class="card-body">
-                        <span class="property-status ${statusClass}">${statusText}</span>
-                        <div class="property-info">
-                            <div class="property-price">${formattedPrice}</div>
-                            <div class="property-address">${properties.location_name}</div>
+                // Extract location data
+                const location = properties.location_name;
+                const { city, state, zipcode } = parseLocationString(location);
+                const county = properties.county || '';
+
+                // Handle status styling
+                const statusClass = properties.status === "Sold" ? 'status-sold' : 
+                                   properties.status === "For Sale" ? 'status-available' : 
+                                   'status-pending';
+                const statusText = properties.status || 'Unknown';
+
+                // Handle property details with proper null checks
+                const bedrooms = properties.bedrooms ? Number(properties.bedrooms) : '-';
+                const bathrooms = properties.bathrooms ? Number(properties.bathrooms) : '-';
+                const sqFootage = properties.sq_footage ? 
+                    new Intl.NumberFormat('en-US').format(Number(properties.sq_footage)) : '-';
+
+                return `
+                    <div class="card property-card" onclick="focusListing(${index})">
+                        <div class="card-body">
+                            <span class="property-status ${statusClass}">${statusText}</span>
+                            <div class="property-info">
+                                <div class="property-price">${formattedPrice}</div>
+                                <div class="property-address">${location}</div>
+                            </div>
+                            
+                            <div class="property-details">
+                                <div class="detail-item">
+                                    <div class="detail-value">${bedrooms}</div>
+                                    <div class="detail-label">Beds</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-value">${bathrooms}</div>
+                                    <div class="detail-label">Baths</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-value">${sqFootage}</div>
+                                    <div class="detail-label">Sq.Ft</div>
+                                </div>
+                            </div>
+
+                            <div class="property-meta">
+                                <div class="meta-item">
+                                    <i class="fas fa-map-marker-alt"></i> ${city}, ${state} ${zipcode}
+                                </div>
+                                ${county ? `
+                                    <div class="meta-item">
+                                        <i class="fas fa-home"></i> ${county}
+                                    </div>
+                                ` : ''}
+                            </div>
                         </div>
-                        
-                        <div class="property-details">
-                            <div class="detail-item">
-                                <div class="detail-value">${properties.bedrooms}</div>
-                                <div class="detail-label">Beds</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-value">${properties.bathrooms}</div>
-                                <div class="detail-label">Baths</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-value">${properties.sq_footage.toLocaleString()}</div>
-                                <div class="detail-label">Sq.Ft</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-value">${properties.year_built}</div>
-                                <div class="detail-label">Year</div>
-                            </div>
-                        </div>
-
-                        <div class="property-description">${properties.description || ''}</div>
-                        
-                        <a href="${properties.link}" target="_blank" class="btn btn-outline-primary btn-sm btn-view-details" 
-                           onclick="event.stopPropagation()">
-                            View Details
-                        </a>
                     </div>
-                </div>
-            `;
+                `;
+            } catch (error) {
+                console.error('Error creating listing card:', error);
+                return '';
+            }
         }
 
         function focusListing(index) {
             const marker = markers[index];
             
-            // Close mobile menu first with a slight delay to allow smooth animation
             if (window.innerWidth <= 768) {
                 const menu = document.querySelector('.mobile-menu');
                 const btn = document.querySelector('.mobile-menu-btn');
                 
-                // Add transparent class first
                 menu.classList.add('transparent');
                 
-                // Wait a bit, then close the menu
                 setTimeout(() => {
-                    menu.classList.remove('active');
-                    menu.classList.remove('transparent'); // Remove transparent class after closing
-                    btn.querySelector('i').classList.remove('fa-times');
-                    btn.querySelector('i').classList.add('fa-bars');
+                    menu.classList.remove('active', 'transparent');
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.classList.remove('fa-times');
+                        icon.classList.add('fa-bars');
+                    }
                     
-                    // Move map to location
                     map.setView(marker.getLatLng(), 16, {
                         animate: true,
                         duration: 1
@@ -453,7 +654,6 @@
                     marker.openPopup();
                 }, 300);
             } else {
-                // Desktop behavior remains the same
                 map.setView(marker.getLatLng(), 16, {
                     animate: true,
                     duration: 1
@@ -471,11 +671,38 @@
 
         // Initialize the application
         window.onload = async function() {
-            await initializeMapStyles();
-            initMap();
-            fetchListings();
-            enableDarkMode();
-            document.getElementById('darkModeToggle').checked = true;
+            try {
+                console.log('Starting application initialization');
+                await initializeMapStyles();
+                
+                if (!initMap()) {
+                    throw new Error('Map initialization failed');
+                }
+                
+                console.log('Map initialized, fetching listings');
+                await fetchListings();
+                
+                enableDarkMode();
+                document.getElementById('darkModeToggle').checked = true;
+                
+                // Add filter event listeners
+                const searchInput = document.getElementById('search-input');
+                const priceFilter = document.getElementById('price-filter');
+                const bedsFilter = document.getElementById('beds-filter');
+                const statusFilter = document.getElementById('status-filter');
+
+                if (searchInput) searchInput.addEventListener('input', debounce(applyFilters, 500));
+                if (priceFilter) priceFilter.addEventListener('change', applyFilters);
+                if (bedsFilter) bedsFilter.addEventListener('change', applyFilters);
+                if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+                
+                console.log('Application initialization complete');
+            } catch (error) {
+                console.error('Error during initialization:', error);
+                const errorMessage = document.getElementById('error-message');
+                errorMessage.textContent = 'Error loading application. Please try refreshing the page.';
+                errorMessage.style.display = 'block';
+            }
         };
 
         function applyFilters() {
@@ -524,12 +751,6 @@
                 features: filteredFeatures
             });
         }
-
-        // Add event listeners for filters
-        document.getElementById('search-input').addEventListener('input', debounce(applyFilters, 500));
-        document.getElementById('price-filter').addEventListener('change', applyFilters);
-        document.getElementById('beds-filter').addEventListener('change', applyFilters);
-        document.getElementById('status-filter').addEventListener('change', applyFilters);
 
         // Debounce function
         function debounce(func, wait) {
@@ -646,6 +867,90 @@
                 }); // Debug log
             }
         });
+
+        // Add a helper function to create markers
+        function createMarker(coordinates, properties) {
+            try {
+                console.log('createMarker input:', {
+                    coordinates,
+                    properties,
+                    propertyDetails: {
+                        bedrooms: properties?.bedrooms,
+                        bathrooms: properties?.bathrooms,
+                        sqFootage: properties?.sq_footage
+                    }
+                });
+                
+                // Ensure coordinates are in the correct order [lng, lat]
+                if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+                    console.error('Invalid coordinates:', coordinates);
+                    return null;
+                }
+
+                const markerColor = properties.status === "Sold" ? '#ff4444' : '#00C851';
+                const icon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="
+                        width: 12px;
+                        height: 12px;
+                        background-color: ${markerColor};
+                        border-radius: 50%;
+                        border: 2px solid white;
+                        box-shadow: 0 0 4px rgba(0,0,0,0.3);
+                    "></div>`,
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6]
+                });
+
+                // Store complete properties on marker
+                const marker = L.marker([coordinates[1], coordinates[0]], { icon });
+                marker.properties = properties;
+
+                marker.bindPopup(createPopupContent(properties), {
+                    closeButton: true,
+                    closeOnClick: true,
+                    autoClose: true,
+                    className: document.body.classList.contains('dark-mode') ? 'dark-mode' : '',
+                    maxWidth: 'auto'
+                });
+
+                marker.addTo(map);
+                console.log('Marker created and added to map');
+                
+                return marker;
+            } catch (error) {
+                console.error('Error creating marker:', error);
+                return null;
+            }
+        }
+
+        // Add cleanup for event listeners
+        window.addEventListener('beforeunload', () => {
+            // Remove map event listeners
+            if (map) {
+                map.remove();
+            }
+            // Remove other event listeners
+            document.querySelectorAll('.property-card').forEach(card => {
+                card.replaceWith(card.cloneNode(true));
+            });
+        });
+
+        // Add this helper function to parse location string
+        function parseLocationString(locationString) {
+            if (!locationString) return {};
+            
+            const parts = locationString.split(',').map(part => part.trim());
+            const stateZipParts = parts[2]?.split(' ') || [];
+            
+            return {
+                address: parts[0] || '',
+                city: parts[1] || '',
+                state: stateZipParts[0] || '',
+                zipcode: stateZipParts[1] || '',
+                country: parts[3] || ''
+            };
+        }
     </script>
 </body>
 </html> 

@@ -239,10 +239,22 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255,255,255,0.8);
+    background: rgba(26, 26, 26, 0.9);
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.loading-overlay .progress {
+    color: white;
+    font-size: 0.9rem;
+    margin-top: 1rem;
+}
+
+.dark-mode .loading-overlay {
+    background: rgba(26, 26, 26, 0.95);
 }
 
 .error-message {
@@ -361,10 +373,10 @@ body.dark-mode {
         left: 0;
         width: 100%;
         height: 85vh;
-        background: #1a1a1a;
+        background: rgba(26, 26, 26, 0.95);
         z-index: 1500;
         transform: translateY(100%);
-        transition: all 0.3s ease;
+        transition: transform 0.3s ease;
         padding: 1rem;
         display: flex;
         flex-direction: column;
@@ -372,16 +384,43 @@ body.dark-mode {
         box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
     }
 
-    /* Add transition for background opacity */
     .mobile-menu.active {
         transform: translateY(0);
-        background: rgba(26, 26, 26, 0.95); /* Slightly transparent by default */
     }
 
-    /* Add transparent state */
     .mobile-menu.transparent {
-        background: rgba(26, 26, 26, 0.3); /* More transparent when item selected */
-        backdrop-filter: blur(5px); /* Optional: adds a blur effect */
+        background: rgba(26, 26, 26, 0.3);
+        backdrop-filter: blur(5px);
+    }
+
+    /* Mobile menu content */
+    .mobile-menu .listing-sidebar {
+        display: block;
+        position: static;
+        height: 100%;
+        width: 100%;
+        max-width: none;
+        background: transparent;
+        padding: 0;
+        overflow-y: auto;
+    }
+
+    /* Mobile menu property cards */
+    .mobile-menu .property-card {
+        background: #2d2d2d;
+        border: 1px solid #404040;
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+        color: white;
+    }
+
+    .mobile-menu .property-card .property-address,
+    .mobile-menu .property-card .detail-value {
+        color: white;
+    }
+
+    .mobile-menu .property-card .detail-label {
+        color: #999;
     }
 
     /* Hamburger button */
@@ -503,5 +542,118 @@ body.dark-mode {
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
+}
+
+/* Update property card styles */
+.property-meta {
+    font-size: 0.65rem;
+    color: #666;
+    margin: 0.5rem 0;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.meta-item i {
+    width: 12px;
+    color: #006AFF;
+}
+
+.property-description {
+    font-size: 0.7rem;
+    color: #666;
+    margin: 0.5rem 0;
+    line-height: 1.2;
+}
+
+/* Update status colors */
+.status-sold {
+    background-color: #ff4444;
+    color: white;
+}
+
+.status-available {
+    background-color: #00C851;
+    color: white;
+}
+
+/* Dark mode adjustments */
+.dark-mode .property-meta,
+.dark-mode .property-description {
+    color: #999;
+}
+
+.dark-mode .meta-item i {
+    color: #006AFF;
+}
+
+/* Add these styles for the popup */
+.leaflet-popup-content {
+    margin: 0;
+    min-width: 300px;
+}
+
+.leaflet-popup-content-wrapper {
+    padding: 0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.popup-card {
+    margin: 0;
+    border: none;
+    box-shadow: none;
+}
+
+.popup-card .card-body {
+    padding: 15px;
+}
+
+/* Adjust popup size for mobile */
+@media (max-width: 768px) {
+    .leaflet-popup-content {
+        min-width: 250px;
+    }
+}
+
+/* Dark mode support for popup */
+.dark-mode .leaflet-popup-content-wrapper {
+    background-color: #2d2d2d;
+    color: #fff;
+}
+
+.dark-mode .leaflet-popup-tip {
+    background-color: #2d2d2d;
+}
+
+.filters-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: 1rem;
+}
+
+.filters-container .form-select {
+    background-color: #2d2d2d;
+    border: none;
+    color: #ffffff;
+    height: 38px;
+    padding: 0 1rem;
+    font-size: 0.9rem;
+    min-width: 120px;
+}
+
+.dark-mode .filters-container .form-select {
+    background-color: #2d2d2d;
+    color: #ffffff;
+}
+
+@media (max-width: 768px) {
+    .filters-container {
+        display: none;
+    }
 }
  
